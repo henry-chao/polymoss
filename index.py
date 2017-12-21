@@ -1,6 +1,11 @@
 from flask import Flask, render_template, url_for, request, redirect, session, jsonify
 import requests
 import configparser
+import os
+import sys
+import errno
+from datetime import datetime
+import pycurl
 
 app = Flask(__name__)
 app.jinja_env.add_extension('pyjade.ext.jinja.PyJadeExtension')
@@ -60,3 +65,62 @@ def getSubmissions():
     request.args.get('assignment_id'))
   submissions_list = requests.get(URL, headers={'Authorization':'Bearer {}'.format(session['token'])})
   return jsonify(submissions_list.json())
+
+@app.route("/submitToMoss")
+def submitToMoss():
+  course_id = request.args.get('course_id')
+  assignment_id = request.args.get('assignment_id')
+  URL = "https://{}/api/v1/courses/{}/assignments/{}/submissions".format(
+    config['Canvas']['canvas_instance'],
+    course_id,
+    assignment_id)
+  submissions_list = requests.get(URL, headers={'Authorization':'Bearer {}'.format(session['token'])})
+
+  ## Begin building out directory locations to download submissions
+  # First determine user's home directory
+  user_home = os.path.expanduser("~")
+
+  # Create directories for course and assignments
+  course_dir = "{}/moss_submissions/{}".format(user_home,course_id)
+  make_dir(course_dir)
+
+  assignment_dir = "{}/{}".format(course_dir,assignment_id)
+  make_dir(assignment_dir)
+
+  report_time = datetime.now().strftime('%Y%m%d%H%M%S')
+  submission_dir = "{}/{}".format(assignment_dir,report_time)
+  make_dir(submission_dir)
+
+  submissions = submissions_list.json()
+
+  for submission in submissions:
+    student_id = submission['user_id']
+    URL = "https://{}/api/v1/users/{}/profile".format(
+      config['Canvas']['canvas_instance'],
+      student_id
+    )
+    student_json = requests.get(URL, headers={'Authorization':'Bearer {}'.format(session['token'])})
+    student_name = student_json.json()['name']
+    student_submission_dir = "{}/{}".format(submission_dir,student_name)
+    make_dir(student_submission_dir)
+    for attachment in submission['attachments']:
+      full_file_path = '{}/{}-{}'.format(student_submission_dir,student_name,attachment['filename'])
+      save_file(attachment['url'], full_file_path)
+
+def make_dir(location):
+  if not os.path.exists(location):
+    try:
+      os.makedirs(location)
+    except OSError as e:
+      if e.errno != e.EEXIST:
+        raise
+
+def save_file(URL, file_location):
+  api = pycurl.Curl()
+  api.setopt(pycurl.URL, URL)
+  api.setopt(pycurl.FOLLOWLOCATION, True)
+  with open(file_location, 'wb') as f:
+    api.setopt(pycurl.WRITEFUNCTION, f.write)
+    api.perform()
+  api.close()
+
