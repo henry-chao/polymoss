@@ -4,7 +4,7 @@ function buildCard(color, card_title, card_body, card_action){
            "<div class='card-content white-text'>" +
              "<span class='card-title'>" + card_title + "</span>" +
            "<p>" + card_body + "</p>" +
-           "<div class='card-action'>" +
+           "<div class='card-action " + color + "'>" +
              "<a onClick='" + card_action + "' >Select</a>" +
            "</div>" +
          "</div>" +
@@ -35,13 +35,21 @@ function getAssignments(id){
   $.get("/getAssignments?id=" + id, function(assignments, status){
     for (assignment in assignments){
       var a = assignments[assignment];
-     $("#assignmentSelection").append(
-        buildCard('green',
-	  a['name'],
-	  a['description'],
+      var description = a['description'];
+
+      if (description === null){
+        description = "No description";
+      } else {
+        description = description.replace(/<{1}[^<>]{1,}>{1}/g," ");
+      }
+
+      $("#assignmentSelection").append(
+         buildCard('green',
+ 	  a['name'],
+	  description,
 	  "getSubmissions(" + a['course_id'] + "," + a['id'] + ");"
 	)
-     ); 
+      ); 
     }
   });
 
