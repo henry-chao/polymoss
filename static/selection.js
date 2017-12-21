@@ -60,7 +60,7 @@ function getSubmissions(course_id, assignment_id){
     $("#submissionsDisplay").append(
      "<div class='card-panel teal'>" +
        "<p class='white-text'>Number of submissions received: " + submissions.length + "</p>" +
-       "<label class='indigo-text'>Input your Moss User ID: <input id='moss_id' type='text-input'></label><br />" +
+       "<label class='white-text'>Input your Moss User ID: <input id='moss_id' type='text-input'></label><br /><br />" +
        "<a class='btn halfway waves-effect waves-light red' id='moss_submit_btn' " +
          "onclick='submitToMoss(" + course_id + "," + assignment_id +");'>" +
          "Submit to Moss</a>" +
@@ -80,9 +80,7 @@ function getSubmissions(course_id, assignment_id){
 function submitToMoss(course_id, assignment_id){
   $("#moss_submit_btn").prop("disabled", true);
   $("#moss_response").empty();
-  $("#moss_response").append(
-    '<div <div class="preloader-wrapper big active"><div class="spinner-layer spinner-blue"><div class="circle-clipper left"><div class="circle"></div></div><div class="gap-patch"><div class="circle"></div></div><div class="circle-clipper right"><div class="circle"></div></div></div>'
-  );
+  $("#moss_response").append("<div class='progress'><div class='indeterminate'></div></div>");
 
   $.get("/submitToMoss?course_id=" + course_id + "&assignment_id=" + assignment_id + "&moss_id=" + $("#moss_id").val(),
     function(url, status){
