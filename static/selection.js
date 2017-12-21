@@ -13,6 +13,7 @@ function buildCard(color, card_title, card_body, card_action){
 
 function getCourses(){
   $.get("/getCourses", function(courses, status){
+    $("#courseSelection").empty();
     for (course in courses){
       var c = courses[course];
       $("#courseSelection").append(
@@ -29,6 +30,7 @@ function getCourses(){
 function getAssignments(id){
   // Clear previous assignment entries
   $("#assignmentSelection").empty();
+  $("#submissionsDisplay").empty();
 
   $.get("/getAssignments?id=" + id, function(assignments, status){
     for (assignment in assignments){
@@ -58,8 +60,8 @@ function getSubmissions(course_id, assignment_id){
     $("#submissionsDisplay").append(
      "<div class='card-panel teal'>" +
        "<p class='white-text'>Number of submissions received: " + submissions.length + "</p>" +
-       "<label class='black-text'>Input your Moss User ID: <input id='moss_id' type='text-input'></label><br />" +
-       "<a class='btn halfway waves-effect waves-light red' " +
+       "<label class='indigo-text'>Input your Moss User ID: <input id='moss_id' type='text-input'></label><br />" +
+       "<a class='btn halfway waves-effect waves-light red' id='moss_submit_btn' " +
          "onclick='submitToMoss(" + course_id + "," + assignment_id +");'>" +
          "Submit to Moss</a>" +
        "<div id='moss_response'></div>" +
@@ -76,14 +78,24 @@ function getSubmissions(course_id, assignment_id){
 };
 
 function submitToMoss(course_id, assignment_id){
+  $("#moss_submit_btn").prop("disabled", true);
+  $("#moss_response").empty();
+  $("#moss_response").append(
+    '<div <div class="preloader-wrapper big active"><div class="spinner-layer spinner-blue"><div class="circle-clipper left"><div class="circle"></div></div><div class="gap-patch"><div class="circle"></div></div><div class="circle-clipper right"><div class="circle"></div></div></div>'
+  );
+
   $.get("/submitToMoss?course_id=" + course_id + "&assignment_id=" + assignment_id + "&moss_id=" + $("#moss_id").val(),
     function(url, status){
+      $("#moss_response").empty();
       $("#moss_response").append("<span class='white-text'>See the Moss report at: " +
-        "<a href='" + url + "'>" + url + "</a></span>");
+        "<a class='indigo-text' href='" + url + "'>" + url + "</a></span>");
     }
   );
 };
 
 $(document).ready(function() {
+  $("#courseSelection").append(
+    '<div <div class="preloader-wrapper big active"><div class="spinner-layer spinner-blue"><div class="circle-clipper left"><div class="circle"></div></div><div class="gap-patch"><div class="circle"></div></div><div class="circle-clipper right"><div class="circle"></div></div></div>'
+  );
   getCourses();
 });

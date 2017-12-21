@@ -7,6 +7,7 @@ import errno
 from datetime import datetime
 import pycurl
 import mosspy
+import shutil
 
 app = Flask(__name__)
 app.jinja_env.add_extension('pyjade.ext.jinja.PyJadeExtension')
@@ -113,6 +114,9 @@ def submitToMoss():
   m.setDirectoryMode(1)
   m.addFilesByWildcard("{}/*/*".format(submission_dir))
   moss_report_url = m.send()
+
+  # Moss report returned, so delete files in staging area
+  shutil.rmtree(submission_dir)
 
   return moss_report_url
 
