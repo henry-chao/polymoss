@@ -5,3 +5,6 @@ header
   link(rel="stylesheet",href="{{ url_for('static',filename='main.css') }}")
   script(src="https://code.jquery.com/jquery-3.2.1.min.js")
   script(src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.100.2/js/materialize.min.js")
+  {% if selectionjs %}
+  script(src="{{ url_for('static',filename='selection.js') }}")
+  {% endif %}

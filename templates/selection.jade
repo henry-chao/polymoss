@@ -2,5 +2,15 @@ extends base
 block content
   .row
     .col.s12.m12.l12.center-align
-      i.large.material-icons account_box
+      i.large.material-icons select_all
       h3 Selection Screen
+      #token(hidden) {{ token }}
+  .row.center-align
+    h4 Courses
+    #courseSelection
+  .row.center-align
+    h4 Assignments
+    #assignmentSelection
+  .row
+    .col.s12.m12.l12
+      #submissionsDisplay
