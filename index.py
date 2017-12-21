@@ -46,7 +46,7 @@ def selection():
 
 @app.route("/getCourses")
 def getCourses():
-  URL = "https://{}/api/v1/courses?page=2".format(config['Canvas']['canvas_instance'])
+  URL = "https://{}/api/v1/courses".format(config['Canvas']['canvas_instance'])
   course_list = requests.get(URL, headers={'Authorization':'Bearer {}'.format(session['token'])})
   return jsonify(course_list.json())
 
