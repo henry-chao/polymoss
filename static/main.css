@@ -7,3 +7,11 @@ body {
 main {
   flex: 1 0 auto;
 }
+
+main ul li {
+  margin-bottom: 15px;
+}
+
+footer a {
+  color: #0d47a1;
+}
