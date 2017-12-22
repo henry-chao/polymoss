@@ -1,4 +1,4 @@
-from flask import Flask, render_template, url_for, request, redirect, session, jsonify
+from flask import Flask, render_template, url_for, request, redirect, session
 import requests
 import configparser
 import os
@@ -10,6 +10,7 @@ import mosspy
 import shutil
 import json
 import zipfile
+import re
 
 app = Flask(__name__)
 app.jinja_env.add_extension('pyjade.ext.jinja.PyJadeExtension')
@@ -72,15 +73,22 @@ def getCourses():
       sublink = link.split(";")
       page_list['next'] = sublink[0][1:-1]
   course_list = response.json()
-  return jsonify({'links':page_list,'course_list':course_list})
+  return render_template('courses.jade',
+    response_obj = {'links':page_list,'course_list':course_list}
+  )
 
 @app.route("/getAssignments")
 def getAssignments():
   URL = "https://{}/api/v1/courses/{}/assignments".format(
     config['Canvas']['canvas_instance'],
     request.args.get('id'))
-  assignments_list = requests.get(URL, headers={'Authorization':'Bearer {}'.format(session['token'])})
-  return jsonify(assignments_list.json())
+  assignments_list = requests.get(URL, headers={'Authorization':'Bearer {}'.format(session['token'])}).json()
+  for assignment in assignments_list:
+    if assignment['description'] is not None:
+      assignment['description'] = re.compile(r'<[^>]+>').sub('',assignment['description'])
+  return render_template('assignments.jade',
+    assignments = assignments_list
+  )
 
 @app.route("/getSubmissions")
 def getSubmissions():
@@ -88,8 +96,10 @@ def getSubmissions():
     config['Canvas']['canvas_instance'],
     request.args.get('course_id'),
     request.args.get('assignment_id'))
-  submissions_list = requests.get(URL, headers={'Authorization':'Bearer {}'.format(session['token'])})
-  return jsonify(submissions_list.json())
+  submissions_response = requests.get(URL, headers={'Authorization':'Bearer {}'.format(session['token'])}).json()
+  return render_template('submission.jade',
+    submissions = submissions_response
+  )
 
 @app.route("/submitToMoss")
 def submitToMoss():

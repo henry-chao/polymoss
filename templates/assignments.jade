@@ -1,0 +1,9 @@
+h4 Assignments
+for assignment in assignments
+  .col.s4.m3
+    .card.small.green.darken-1
+      .card-content.white-text
+        span.card-title #{assignment.name}
+        p #{assignment.description}
+      .card-action.green
+        a(onClick="getSubmissions(#{assignment.course_id},#{assignment.id});") Select

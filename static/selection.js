@@ -1,16 +1,3 @@
-function buildCard(color, card_title, card_body, card_action){
-  return  "<div class='col s4 m3'>" +
-          "<div class='card small " + color + " darken-1'>" +
-           "<div class='card-content white-text'>" +
-             "<span class='card-title'>" + card_title + "</span>" +
-           "<p>" + card_body + "</p>" +
-           "<div class='card-action " + color + "'>" +
-             "<a onClick='" + card_action + "' >Select</a>" +
-           "</div>" +
-         "</div>" +
-         "</div>"
-};
-
 function getCourses(url){
   $.ajax({
     url: "/getCourses",
@@ -21,32 +8,7 @@ function getCourses(url){
     complete: function(data, status){
       $("#courseSelection").empty();
       $("#nav_btns_row").remove();
-      courses = data.responseJSON['course_list'];
-      for (course in courses){
-        var c = courses[course];
-        $("#courseSelection").append(
-          buildCard('blue-grey',
-	    c['course_code'],
-	    c['name'],
-	    "getAssignments(" + c['id'] + ");"
-	  )
-        );
-      }
-
-      if (data.responseJSON['links'] !== undefined){
-        var links = data.responseJSON['links'];
-        $("#courseSelection").after(
-          "<div class='row' id='nav_btns_row'><div class='col s12' id='nav_btns_col'>"
-        );
-        for (link in links){
-          $("#nav_btns_col").append(
-            "<a class='btn' onclick='getCourses(\"" + links[link] + "\");'>" + link + "</a>"
-          );
-        }
-	$("#nav_btns_row").after(
-          "</div></div>"
-        );
-      }
+      $("#courseSelection").append( data.responseText );
     }
   });
 };
@@ -56,25 +18,8 @@ function getAssignments(id){
   $("#assignmentSelection").empty();
   $("#submissionsDisplay").empty();
 
-  $.get("/getAssignments?id=" + id, function(assignments, status){
-    for (assignment in assignments){
-      var a = assignments[assignment];
-      var description = a['description'];
-
-      if (description === null){
-        description = "No description";
-      } else {
-        description = description.replace(/<{1}[^<>]{1,}>{1}/g," ");
-      }
-
-      $("#assignmentSelection").append(
-         buildCard('green',
- 	  a['name'],
-	  description,
-	  "getSubmissions(" + a['course_id'] + "," + a['id'] + ");"
-	)
-      ); 
-    }
+  $.get("/getAssignments?id=" + id, function(data, status){
+    $("#assignmentSelection").append( data );
   });
 
   // Scroll down if there is a long list of courses and assignments
@@ -88,17 +33,8 @@ function getAssignments(id){
 function getSubmissions(course_id, assignment_id){
   $("#submissionsDisplay").empty();
 
-  $.get("/getSubmissions?course_id=" + course_id + "&assignment_id=" + assignment_id, function(submissions, status){
-    $("#submissionsDisplay").append(
-     "<div class='card-panel teal'>" +
-       "<p class='white-text'>Number of submissions received: " + submissions.length + "</p>" +
-       "<label class='white-text'>Input your Moss User ID: <input id='moss_id' type='text-input' class='black-text'></label><br /><br />" +
-       "<a class='btn halfway waves-effect waves-light red' id='moss_submit_btn' " +
-         "onclick='submitToMoss(" + course_id + "," + assignment_id +");'>" +
-         "Submit to Moss</a>" +
-       "<div id='moss_response'></div>" +
-     "</div>" 
-    );
+  $.get("/getSubmissions?course_id=" + course_id + "&assignment_id=" + assignment_id, function(data, status){
+    $("#submissionsDisplay").append( data );
   });
 
   // Scroll down if there is a long list of courses and assignments
