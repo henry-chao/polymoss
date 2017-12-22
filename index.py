@@ -9,6 +9,7 @@ import pycurl
 import mosspy
 import shutil
 import json
+import zipfile
 
 app = Flask(__name__)
 app.jinja_env.add_extension('pyjade.ext.jinja.PyJadeExtension')
@@ -130,6 +131,10 @@ def submitToMoss():
     for attachment in submission['attachments']:
       full_file_path = '{}/{}-{}'.format(student_submission_dir,student_name,attachment['filename'])
       save_file(attachment['url'], full_file_path)
+      if (attachment['content-type'] == 'application/x-zip-compressed'):
+        with zipfile.ZipFile(full_file_path,"r") as zip_ref:
+          zip_ref.extractall(student_submission_dir)
+        os.remove(full_file_path)
 
   # Files are all downloaded, now submit to moss
   m = mosspy.Moss(request.args.get('moss_id'),"python")
