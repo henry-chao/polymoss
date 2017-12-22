@@ -98,7 +98,10 @@ def getSubmissions():
     request.args.get('assignment_id'))
   submissions_response = requests.get(URL, headers={'Authorization':'Bearer {}'.format(session['token'])}).json()
   return render_template('submission.jade',
-    submissions = submissions_response
+    submissions = submissions_response,
+    course_id = request.args.get('course_id'),
+    assignment_id = request.args.get('assignment_id'),
+    moss_languages = mosspy.Moss(0).getLanguages()
   )
 
 @app.route("/submitToMoss")
@@ -147,7 +150,7 @@ def submitToMoss():
         os.remove(full_file_path)
 
   # Files are all downloaded, now submit to moss
-  m = mosspy.Moss(request.args.get('moss_id'),"python")
+  m = mosspy.Moss(request.args.get('moss_id'), str(request.args.get('code_type')))
   m.setDirectoryMode(1)
   m.addFilesByWildcard("{}/*/*".format(submission_dir))
   moss_report_url = m.send()

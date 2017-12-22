@@ -35,6 +35,7 @@ function getSubmissions(course_id, assignment_id){
 
   $.get("/getSubmissions?course_id=" + course_id + "&assignment_id=" + assignment_id, function(data, status){
     $("#submissionsDisplay").append( data );
+    $('#code_type').material_select();
   });
 
   // Scroll down if there is a long list of courses and assignments
@@ -50,11 +51,11 @@ function submitToMoss(course_id, assignment_id){
   $("#moss_response").empty();
   $("#moss_response").append("<div class='progress'><div class='indeterminate'></div></div>");
 
-  $.get("/submitToMoss?course_id=" + course_id + "&assignment_id=" + assignment_id + "&moss_id=" + $("#moss_id").val(),
+  $.get("/submitToMoss?course_id=" + course_id + "&assignment_id=" + assignment_id + "&moss_id=" + $("#moss_id").val() + "&code_type=" + $("#code_type").val(),
     function(url, status){
       $("#moss_response").empty();
       $("#moss_response").append("<span class='white-text'>See the Moss report at: " +
-        "<a class='indigo-text' href='" + url + "'>" + url + "</a></span>");
+        "<a class='indigo-text' target='_blank' href='" + url + "'>" + url + "</a></span>");
     }
   );
 };

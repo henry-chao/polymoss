@@ -1,8 +1,14 @@
 .card-panel.teal
   p.white-text Number of submissions received: #{submissions|length}
-  label.white-text Input your Moss User ID:
-    input.black-text#moss_id(type="text-input")
-  br
-  br
-  a.btn.waves-effect.waves-light.red#moss_submit_btn(onclick="submitToMoss( #{submissions.course_id} , #{submissions.assignment_id} );") Submit to Moss
+  .row
+    .input-field.col.s6
+      input.validate#moss_id(type="text")
+      label.black-text(for="moss_id") Input your Moss User ID:
+  .row
+    .input-field.col.s6
+      select#code_type
+        each language in moss_languages
+          option= language
+      label.black-text Select code type:
+  a.btn.waves-effect.waves-light.red#moss_submit_btn(onclick="submitToMoss( #{course_id} , #{assignment_id} );") Submit to Moss
   #moss_response
