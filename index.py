@@ -28,6 +28,11 @@ def index():
 
 @app.route("/oauth")
 def ouath():
+  if session['token'] is not None:
+    # Delete all existing tokens on Canvas, and request a new one
+    URL = "https://{}/login/oauth2/token".format(config['Canvas']['canvas_instance'])
+    del_token_res = requests.delete(URL, headers={'Authorization':'Bearer {}'.format(session['token'])})
+
   token_req = {'grant_type': 'authorization_code',
                'client_id': config['Canvas']['client_id'],
                'client_secret': config['Canvas']['client_secret'],
