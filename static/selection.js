@@ -11,18 +11,42 @@ function buildCard(color, card_title, card_body, card_action){
          "</div>"
 };
 
-function getCourses(){
-  $.get("/getCourses", function(courses, status){
-    $("#courseSelection").empty();
-    for (course in courses){
-      var c = courses[course];
-      $("#courseSelection").append(
-	buildCard('blue-grey',
-	  c['course_code'],
-	  c['name'],
-	  "getAssignments(" + c['id'] + ");"
-	)
-      );
+function getCourses(url){
+  $.ajax({
+    url: "/getCourses",
+    dataType: 'json',
+    contentType: 'application/json',
+    data: JSON.stringify('{"url":"' + url + '"}'),
+    type: 'POST',
+    complete: function(data, status){
+      $("#courseSelection").empty();
+      $("#nav_btns_row").remove();
+      courses = data.responseJSON['course_list'];
+      for (course in courses){
+        var c = courses[course];
+        $("#courseSelection").append(
+          buildCard('blue-grey',
+	    c['course_code'],
+	    c['name'],
+	    "getAssignments(" + c['id'] + ");"
+	  )
+        );
+      }
+
+      if (data.responseJSON['links'] !== undefined){
+        var links = data.responseJSON['links'];
+        $("#courseSelection").after(
+          "<div class='row' id='nav_btns_row'><div class='col s12' id='nav_btns_col'>"
+        );
+        for (link in links){
+          $("#nav_btns_col").append(
+            "<a class='btn' onclick='getCourses(\"" + links[link] + "\");'>" + link + "</a>"
+          );
+        }
+	$("#nav_btns_row").after(
+          "</div></div>"
+        );
+      }
     }
   });
 };
@@ -68,7 +92,7 @@ function getSubmissions(course_id, assignment_id){
     $("#submissionsDisplay").append(
      "<div class='card-panel teal'>" +
        "<p class='white-text'>Number of submissions received: " + submissions.length + "</p>" +
-       "<label class='white-text'>Input your Moss User ID: <input id='moss_id' type='text-input'></label><br /><br />" +
+       "<label class='white-text'>Input your Moss User ID: <input id='moss_id' type='text-input' class='black-text'></label><br /><br />" +
        "<a class='btn halfway waves-effect waves-light red' id='moss_submit_btn' " +
          "onclick='submitToMoss(" + course_id + "," + assignment_id +");'>" +
          "Submit to Moss</a>" +

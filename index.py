@@ -8,6 +8,7 @@ from datetime import datetime
 import pycurl
 import mosspy
 import shutil
+import json
 
 app = Flask(__name__)
 app.jinja_env.add_extension('pyjade.ext.jinja.PyJadeExtension')
@@ -45,11 +46,27 @@ def selection():
     selectionjs = True
   )
 
-@app.route("/getCourses")
+@app.route("/getCourses", methods=['POST','GET'])
 def getCourses():
-  URL = "https://{}/api/v1/courses".format(config['Canvas']['canvas_instance'])
-  course_list = requests.get(URL, headers={'Authorization':'Bearer {}'.format(session['token'])})
-  return jsonify(course_list.json())
+  URL = ""
+  json_data = json.loads(request.get_json())
+  if not(json_data['url'] == "undefined"):
+    URL = json_data['url']
+  else:
+    URL = "https://{}/api/v1/courses?per_page=12".format(config['Canvas']['canvas_instance'])
+  print(URL)
+  response = requests.get(URL, headers={'Authorization':'Bearer {}'.format(session['token'])})
+  links_list = response.headers['Link'].split(",")
+  page_list = {}
+  for link in links_list:
+    if "prev" in link:
+      sublink = link.split(";")
+      page_list['prev'] = sublink[0][1:-1]
+    elif "next" in link:
+      sublink = link.split(";")
+      page_list['next'] = sublink[0][1:-1]
+  course_list = response.json()
+  return jsonify({'links':page_list,'course_list':course_list})
 
 @app.route("/getAssignments")
 def getAssignments():
