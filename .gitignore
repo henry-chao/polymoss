@@ -1,5 +1,6 @@
 flask_env.sh
 config.ini
+config.ini.example
 moss.py-master/
 
 # Byte-compiled / optimized / DLL files
