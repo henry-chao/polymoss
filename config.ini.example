@@ -1,0 +1,8 @@
+[Canvas]
+canvas_instance = enter.in.canvas.instance
+client_id = enter.in.client.id.from.developer.key
+client_secret = enter.in.client.secret.from.developer.key
+redirect_uri = enter.in.redirect_uri.from.developer.key
+
+[App]
+key = enter.in.secret.for.session.security
