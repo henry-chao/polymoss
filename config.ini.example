@@ -6,3 +6,8 @@ redirect_uri = enter.in.redirect_uri.from.developer.key
 
 [App]
 key = enter.in.secret.for.session.security
+
+[Logging]
+time_format = [%%Y-%%b-%%d %%H:%%M:%%S]
+log_file_location = /var/log/polymoss/app.log
+

@@ -11,6 +11,9 @@ import shutil
 import json
 import zipfile
 import re
+import logging
+from logging.handlers import RotatingFileHandler
+from time import strftime
 
 app = Flask(__name__)
 app.jinja_env.add_extension('pyjade.ext.jinja.PyJadeExtension')
@@ -18,6 +21,14 @@ app.jinja_env.add_extension('pyjade.ext.jinja.PyJadeExtension')
 config = configparser.ConfigParser()
 config.read('config.ini')
 app.secret_key = config['App']['key']
+
+ts = strftime(config['Logging']['time_format'])
+logfile_location = config['Logging']['log_file_location']
+
+handler = RotatingFileHandler(logfile_location, maxBytes=10000, backupCount=3)
+logger = logging.getLogger('__name__')
+logger.setLevel(logging.INFO)
+logger.addHandler(handler)
 
 @app.route("/")
 def index():
@@ -131,6 +142,7 @@ def submitToMoss():
 
   submissions = submissions_list.json()
 
+  submissions_to_send_to_moss = []
   for submission in submissions:
     student_id = submission['user_id']
     URL = "https://{}/api/v1/users/{}/profile".format(
@@ -147,12 +159,18 @@ def submitToMoss():
       if (attachment['content-type'] == 'application/x-zip-compressed'):
         with zipfile.ZipFile(full_file_path,"r") as zip_ref:
           zip_ref.extractall(student_submission_dir)
+          for extracted_file in zip_ref.namelist():
+            submissions_to_send_to_moss.append("{}/{}".format(student_submission_dir,extracted_file))
         os.remove(full_file_path)
+      else:
+        submissions_to_send_to_moss.append(full_file_path)
 
   # Files are all downloaded, now submit to moss
   m = mosspy.Moss(request.args.get('moss_id'), str(request.args.get('code_type')))
   m.setDirectoryMode(1)
-  m.addFilesByWildcard("{}/*/*".format(submission_dir))
+  for moss_file in submissions_to_send_to_moss:
+    logger.info('{} {} {}'.format(ts, 'Submitting to moss: ', moss_file))
+    m.addFile(moss_file)
   moss_report_url = m.send()
 
   # Moss report returned, so delete files in staging area
