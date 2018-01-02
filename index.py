@@ -55,6 +55,8 @@ def ouath():
 
   response = requests.post("https://{}/login/oauth2/token".format(config['Canvas']['canvas_instance']), json=token_req)
   access_token = response.json()['access_token']
+  session['name'] = response.json()['user']['name']
+  logger.info('{} Canvas auth token received for user: {}'.format(ts, session['name']))
   session['token'] = access_token
   return redirect(url_for('selection'))
 
@@ -72,7 +74,6 @@ def getCourses():
     URL = json_data['url']
   else:
     URL = "https://{}/api/v1/courses?per_page=12".format(config['Canvas']['canvas_instance'])
-  print(URL)
   response = requests.get(URL, headers={'Authorization':'Bearer {}'.format(session['token'])})
   links_list = response.headers['Link'].split(",")
   page_list = {}
@@ -93,6 +94,7 @@ def getAssignments():
   URL = "https://{}/api/v1/courses/{}/assignments".format(
     config['Canvas']['canvas_instance'],
     request.args.get('id'))
+  logger.info('{} {} Pulling all assignments for course ID: {}'.format(ts, session['name'], request.args.get('id')))
   assignments_list = requests.get(URL, headers={'Authorization':'Bearer {}'.format(session['token'])}).json()
   for assignment in assignments_list:
     if assignment['description'] is not None:
@@ -107,6 +109,7 @@ def getSubmissions():
     config['Canvas']['canvas_instance'],
     request.args.get('course_id'),
     request.args.get('assignment_id'))
+  logger.info('{} {} Getting submission count for course {} assignment {}'.format(ts, session['name'], request.args.get('course_id'), request.args.get('assignment_id')))
   submissions_response = requests.get(URL, headers={'Authorization':'Bearer {}'.format(session['token'])}).json()
   return render_template('submission.jade',
     submissions = submissions_response,
@@ -167,9 +170,9 @@ def submitToMoss():
 
   # Files are all downloaded, now submit to moss
   m = mosspy.Moss(request.args.get('moss_id'), str(request.args.get('code_type')))
-  m.setDirectoryMode(1)
+  #m.setDirectoryMode(1)
   for moss_file in submissions_to_send_to_moss:
-    logger.info('{} {} {}'.format(ts, 'Submitting to moss: ', moss_file))
+    logger.info('{} {} Submitting to moss: {}'.format(ts, session['name'], moss_file))
     m.addFile(moss_file)
   moss_report_url = m.send()
 
