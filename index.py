@@ -124,7 +124,7 @@ def getSubmissions():
       submissions_count += 1
 
   # Query database for user information
-  user = query_db('select * from Users where USER_NAME = ?', session['name'], one=True)
+  user = query_db('select * from Users where USER_NAME = ?', [session['name']], one=True)
   logger.info('{} Found user {}'.format(ts, user))
 
   return render_template('submission.jade',
@@ -188,8 +188,9 @@ def submitToMoss():
           submissions_to_send_to_moss.append(full_file_path)
 
   # Files are all downloaded, now submit to moss
-  moss_id = query_db('select MOSS_ID from Users where USER_NAME = ?', session['name'], one=True)
-  m = mosspy.Moss(moss_id[0], str(request.args.get('code_type')))
+  moss_query = query_db('select MOSS_ID from Users where USER_NAME = ?', [session['name']], one=True)
+  moss_id = moss_query[0]
+  m = mosspy.Moss(moss_id, str(request.args.get('code_type')))
   #m.setDirectoryMode(1)
   for moss_file in submissions_to_send_to_moss:
     logger.info('{} {} Submitting to moss: {}'.format(ts, session['name'], moss_file))
@@ -198,6 +199,9 @@ def submitToMoss():
 
   # Moss report returned, so delete files in staging area
   shutil.rmtree(submission_dir)
+
+  query_db('INSERT INTO Submissions (MOSS_ID, SUBMISSION_TIME, COURSE_ID, ASSIGNMENT_ID, URL) VALUES(?, ?, ?, ?, ?)',
+    [int(moss_id),strftime('%Y-%m-%d %H:%M:%S.000'),int(course_id),int(assignment_id),moss_report_url], insert=True)
 
   return moss_report_url
 
@@ -230,13 +234,17 @@ def close_connection(exception):
   if db is not None:
     db.close()
 
-def query_db(query, args=(), one=False):
+def query_db(query, args=(), one=False, insert=False):
   try:
     logger.info('{} Executing query:\n{}\nWith arguments:\n{}'.format(ts, query, args))
-    cur = get_db().execute(query, [args])
-    resultset = cur.fetchall()
-    cur.close()
-    return (resultset[0] if resultset else None) if one else resultset
+    cur = get_db().execute(query, args)
+    if insert:
+      get_db().commit()
+      cur.close()
+    else:
+      resultset = cur.fetchall()
+      cur.close()
+      return (resultset[0] if resultset else None) if one else resultset
   except:
     logger.error('{} An error has occured:\n{}'.format(ts, sys.exc_info()[0]))
     raise
