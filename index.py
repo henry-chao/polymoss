@@ -117,10 +117,17 @@ def getSubmissions():
     request.args.get('assignment_id'))
   logger.info('{} {} Getting submission count for course {} assignment {}'.format(ts, session['name'], request.args.get('course_id'), request.args.get('assignment_id')))
   submissions_response = requests.get(URL, headers={'Authorization':'Bearer {}'.format(session['token'])}).json()
+
+  # Query database for user information
+  user = query_db('select * from Users where USER_NAME = ?', session['name'], one=True)
+  logger.info('{} Found user {}'.format(ts, user))
+
   return render_template('submission.jade',
     submissions = submissions_response,
     course_id = request.args.get('course_id'),
     assignment_id = request.args.get('assignment_id'),
+    moss_id = user[0],
+    user_name = user[1],
     moss_languages = mosspy.Moss(0).getLanguages()
   )
 
@@ -215,4 +222,15 @@ def close_connection(exception):
   db = getattr(g, '_database', None)
   if db is not None:
     db.close()
+
+def query_db(query, args=(), one=False):
+  try:
+    logger.info('{} Executing query:\n{}\nWith arguments:\n{}'.format(ts, query, args))
+    cur = get_db().execute(query, [args])
+    resultset = cur.fetchall()
+    cur.close()
+    return (resultset[0] if resultset else None) if one else resultset
+  except:
+    logger.error('{} An error has occured:\n{}'.format(ts, sys.exc_info()[0]))
+    raise
 

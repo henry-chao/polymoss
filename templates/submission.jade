@@ -1,9 +1,9 @@
 .card-panel.teal
   p.white-text Number of submissions received: #{submissions|length}
   .row
-    .input-field.col.s6
-      input.validate#moss_id(type="text")
-      label.black-text(for="moss_id") Input your Moss User ID:
+    .col.s6
+      p.white-text Submitting assignments under MOSS ID #[b #{moss_id}]
+      p.white-text For user #[b #{user_name}]
   .row
     .input-field.col.s6
       select#code_type
