@@ -11,3 +11,6 @@ key = enter.in.secret.for.session.security
 time_format = [%%Y-%%b-%%d %%H:%%M:%%S]
 log_file_location = /var/log/polymoss/app.log
 
+[Database]
+path = /path/to/database/file
+

@@ -2,6 +2,7 @@ flask_env.sh
 config.ini
 config.ini.example
 moss.py-master/
+db.sql
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

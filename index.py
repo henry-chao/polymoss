@@ -1,4 +1,4 @@
-from flask import Flask, render_template, url_for, request, redirect, session
+from flask import Flask, render_template, url_for, request, redirect, session, g
 import requests
 import configparser
 import os
@@ -14,6 +14,7 @@ import re
 import logging
 from logging.handlers import RotatingFileHandler
 from time import strftime
+import sqlite3
 
 app = Flask(__name__)
 app.jinja_env.add_extension('pyjade.ext.jinja.PyJadeExtension')
@@ -21,6 +22,8 @@ app.jinja_env.add_extension('pyjade.ext.jinja.PyJadeExtension')
 config = configparser.ConfigParser()
 config.read('config.ini')
 app.secret_key = config['App']['key']
+
+database = config['Database']['path']
 
 ts = strftime(config['Logging']['time_format'])
 logfile_location = config['Logging']['log_file_location']
@@ -200,4 +203,16 @@ def save_file(URL, file_location):
     api.setopt(pycurl.WRITEFUNCTION, f.write)
     api.perform()
   api.close()
+
+def get_db():
+  db = getattr(g, '_database', None)
+  if db is None:
+    db = g._database = sqlite3.connect(database)
+  return db
+
+@app.teardown_appcontext
+def close_connection(exception):
+  db = getattr(g, '_database', None)
+  if db is not None:
+    db.close()
 
