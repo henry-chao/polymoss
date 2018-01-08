@@ -118,12 +118,17 @@ def getSubmissions():
   logger.info('{} {} Getting submission count for course {} assignment {}'.format(ts, session['name'], request.args.get('course_id'), request.args.get('assignment_id')))
   submissions_response = requests.get(URL, headers={'Authorization':'Bearer {}'.format(session['token'])}).json()
 
+  submissions_count = 0
+  for sr in submissions_response:
+    if sr['workflow_state'] == 'submitted':
+      submissions_count += 1
+
   # Query database for user information
   user = query_db('select * from Users where USER_NAME = ?', session['name'], one=True)
   logger.info('{} Found user {}'.format(ts, user))
 
   return render_template('submission.jade',
-    submissions = submissions_response,
+    submissions_count = submissions_count,
     course_id = request.args.get('course_id'),
     assignment_id = request.args.get('assignment_id'),
     moss_id = user[0],
@@ -160,26 +165,27 @@ def submitToMoss():
 
   submissions_to_send_to_moss = []
   for submission in submissions:
-    student_id = submission['user_id']
-    URL = "https://{}/api/v1/users/{}/profile".format(
-      config['Canvas']['canvas_instance'],
-      student_id
-    )
-    student_json = requests.get(URL, headers={'Authorization':'Bearer {}'.format(session['token'])})
-    student_name = student_json.json()['name']
-    student_submission_dir = "{}/{}".format(submission_dir,student_name)
-    make_dir(student_submission_dir)
-    for attachment in submission['attachments']:
-      full_file_path = '{}/{}-{}'.format(student_submission_dir,student_name,attachment['filename'])
-      save_file(attachment['url'], full_file_path)
-      if (attachment['content-type'] == 'application/x-zip-compressed'):
-        with zipfile.ZipFile(full_file_path,"r") as zip_ref:
-          zip_ref.extractall(student_submission_dir)
-          for extracted_file in zip_ref.namelist():
-            submissions_to_send_to_moss.append("{}/{}".format(student_submission_dir,extracted_file))
-        os.remove(full_file_path)
-      else:
-        submissions_to_send_to_moss.append(full_file_path)
+    if submission['workflow_state'] == 'submitted':
+      student_id = submission['user_id']
+      URL = "https://{}/api/v1/users/{}/profile".format(
+        config['Canvas']['canvas_instance'],
+        student_id
+      )
+      student_json = requests.get(URL, headers={'Authorization':'Bearer {}'.format(session['token'])})
+      student_name = student_json.json()['name']
+      student_submission_dir = "{}/{}".format(submission_dir,student_name)
+      make_dir(student_submission_dir)
+      for attachment in submission['attachments']:
+        full_file_path = '{}/{}-{}'.format(student_submission_dir,student_name,attachment['filename'])
+        save_file(attachment['url'], full_file_path)
+        if (attachment['content-type'] == 'application/x-zip-compressed'):
+          with zipfile.ZipFile(full_file_path,"r") as zip_ref:
+            zip_ref.extractall(student_submission_dir)
+            for extracted_file in zip_ref.namelist():
+              submissions_to_send_to_moss.append("{}/{}".format(student_submission_dir,extracted_file))
+          os.remove(full_file_path)
+        else:
+          submissions_to_send_to_moss.append(full_file_path)
 
   # Files are all downloaded, now submit to moss
   m = mosspy.Moss(request.args.get('moss_id'), str(request.args.get('code_type')))
