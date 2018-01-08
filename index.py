@@ -41,24 +41,27 @@ def index():
 
 @app.route("/oauth")
 def ouath():
-  if 'token' in session:
-    # Delete all existing tokens on Canvas, and request a new one
-    URL = "https://{}/login/oauth2/token".format(config['Canvas']['canvas_instance'])
-    del_token_res = requests.delete(URL, headers={'Authorization':'Bearer {}'.format(session['token'])})
-
-  token_req = {'grant_type': 'authorization_code',
-               'client_id': config['Canvas']['client_id'],
-               'client_secret': config['Canvas']['client_secret'],
-               'redirect_uri': config['Canvas']['redirect_uri'],
-               'code': request.args.get('code')
-  }
-
-  response = requests.post("https://{}/login/oauth2/token".format(config['Canvas']['canvas_instance']), json=token_req)
-  access_token = response.json()['access_token']
-  session['name'] = response.json()['user']['name']
-  logger.info('{} Canvas auth token received for user: {}'.format(ts, session['name']))
-  session['token'] = access_token
-  return redirect(url_for('selection'))
+  if request.args.get('error') is not None:
+    return render_template('canvas_error.jade')
+  else:
+    if 'token' in session:
+      # Delete all existing tokens on Canvas, and request a new one
+      URL = "https://{}/login/oauth2/token".format(config['Canvas']['canvas_instance'])
+      del_token_res = requests.delete(URL, headers={'Authorization':'Bearer {}'.format(session['token'])})
+  
+    token_req = {'grant_type': 'authorization_code',
+                 'client_id': config['Canvas']['client_id'],
+                 'client_secret': config['Canvas']['client_secret'],
+                 'redirect_uri': config['Canvas']['redirect_uri'],
+                 'code': request.args.get('code')
+    }
+  
+    response = requests.post("https://{}/login/oauth2/token".format(config['Canvas']['canvas_instance']), json=token_req)
+    access_token = response.json()['access_token']
+    session['name'] = response.json()['user']['name']
+    logger.info('{} Canvas auth token received for user: {}'.format(ts, session['name']))
+    session['token'] = access_token
+    return redirect(url_for('selection'))
 
 @app.route("/selection")
 def selection():
