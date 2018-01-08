@@ -188,7 +188,8 @@ def submitToMoss():
           submissions_to_send_to_moss.append(full_file_path)
 
   # Files are all downloaded, now submit to moss
-  m = mosspy.Moss(request.args.get('moss_id'), str(request.args.get('code_type')))
+  moss_id = query_db('select MOSS_ID from Users where USER_NAME = ?', session['name'], one=True)
+  m = mosspy.Moss(moss_id[0], str(request.args.get('code_type')))
   #m.setDirectoryMode(1)
   for moss_file in submissions_to_send_to_moss:
     logger.info('{} {} Submitting to moss: {}'.format(ts, session['name'], moss_file))

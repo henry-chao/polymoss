@@ -51,7 +51,7 @@ function submitToMoss(course_id, assignment_id){
   $("#moss_response").empty();
   $("#moss_response").append("<div class='progress'><div class='indeterminate'></div></div>");
 
-  $.get("/submitToMoss?course_id=" + course_id + "&assignment_id=" + assignment_id + "&moss_id=" + $("#moss_id").val() + "&code_type=" + $("#code_type").val(),
+  $.get("/submitToMoss?course_id=" + course_id + "&assignment_id=" + assignment_id + "&code_type=" + $("#code_type").val(),
     function(url, status){
       $("#moss_response").empty();
       $("#moss_response").append("<span class='white-text'>See the Moss report at: " +
