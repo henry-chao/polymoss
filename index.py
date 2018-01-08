@@ -3,8 +3,6 @@ import requests
 import configparser
 import os
 import sys
-import errno
-from datetime import datetime
 import pycurl
 import mosspy
 import shutil
@@ -169,46 +167,7 @@ def submitToMoss():
       assignment_id)
     submissions_list = requests.get(URL, headers={'Authorization':'Bearer {}'.format(session['token'])})
   
-    ## Begin building out directory locations to download submissions
-    # First determine user's home directory
-    user_home = os.path.expanduser("~")
-  
-    # Create directories for course and assignments
-    course_dir = "{}/moss_submissions/{}".format(user_home,course_id)
-    make_dir(course_dir)
-  
-    assignment_dir = "{}/{}".format(course_dir,assignment_id)
-    make_dir(assignment_dir)
-  
-    report_time = datetime.now().strftime('%Y%m%d%H%M%S')
-    submission_dir = "{}/{}".format(assignment_dir,report_time)
-    make_dir(submission_dir)
-  
-    submissions = submissions_list.json()
-  
-    submissions_to_send_to_moss = []
-    for submission in submissions:
-      if submission['workflow_state'] == 'submitted':
-        student_id = submission['user_id']
-        URL = "https://{}/api/v1/users/{}/profile".format(
-          config['Canvas']['canvas_instance'],
-          student_id
-        )
-        student_json = requests.get(URL, headers={'Authorization':'Bearer {}'.format(session['token'])})
-        student_name = student_json.json()['name']
-        student_submission_dir = "{}/{}".format(submission_dir,student_name)
-        make_dir(student_submission_dir)
-        for attachment in submission['attachments']:
-          full_file_path = '{}/{}-{}'.format(student_submission_dir,student_name,attachment['filename'])
-          save_file(attachment['url'], full_file_path)
-          if (attachment['content-type'] == 'application/x-zip-compressed'):
-            with zipfile.ZipFile(full_file_path,"r") as zip_ref:
-              zip_ref.extractall(student_submission_dir)
-              for extracted_file in zip_ref.namelist():
-                submissions_to_send_to_moss.append("{}/{}".format(student_submission_dir,extracted_file))
-            os.remove(full_file_path)
-          else:
-            submissions_to_send_to_moss.append(full_file_path)
+    (submissions_to_send_to_moss, submission_dir) = download_submissions_for_moss(submissions_list.json(), course_id, assignment_id)
   
     # Files are all downloaded, now submit to moss
     moss_query = query_db('select MOSS_ID from Users where USER_NAME = ?', [session['name']], one=True)
@@ -232,6 +191,52 @@ def submitToMoss():
       [int(moss_id),strftime('%Y-%m-%d %H:%M:%S.000'),int(course_id),int(assignment_id),moss_report_url], insert=True)
   
     return moss_report_url
+  except:
+    logger.error('{} An error has occured:\n{}'.format(ts, sys.exc_info()[0]))
+    raise
+
+def download_submissions_for_moss(submissions_list, course_id, assignment_id):
+  try:
+    ## Begin building out directory locations to download submissions
+    # First determine user's home directory
+    user_home = os.path.expanduser("~")
+    
+    # Create directories for course and assignments
+    course_dir = "{}/moss_submissions/{}".format(user_home,course_id)
+    make_dir(course_dir)
+    
+    assignment_dir = "{}/{}".format(course_dir,assignment_id)
+    make_dir(assignment_dir)
+    
+    report_time = strftime('%Y%m%d%H%M%S')
+    submission_dir = "{}/{}".format(assignment_dir,report_time)
+    make_dir(submission_dir)
+    
+    submissions_to_send_to_moss = []
+    for submission in submissions_list:
+      if submission['workflow_state'] == 'submitted':
+        student_id = submission['user_id']
+        URL = "https://{}/api/v1/users/{}/profile".format(
+          config['Canvas']['canvas_instance'],
+          student_id
+        )
+        student_json = requests.get(URL, headers={'Authorization':'Bearer {}'.format(session['token'])})
+        student_name = student_json.json()['name']
+        student_submission_dir = "{}/{}".format(submission_dir,student_name)
+        make_dir(student_submission_dir)
+        for attachment in submission['attachments']:
+          full_file_path = '{}/{}-{}'.format(student_submission_dir,student_name,attachment['filename'])
+          save_file(attachment['url'], full_file_path)
+          if (attachment['content-type'] == 'application/x-zip-compressed'):
+            with zipfile.ZipFile(full_file_path,"r") as zip_ref:
+              zip_ref.extractall(student_submission_dir)
+              for extracted_file in zip_ref.namelist():
+                submissions_to_send_to_moss.append("{}/{}".format(student_submission_dir,extracted_file))
+            os.remove(full_file_path)
+          else:
+            submissions_to_send_to_moss.append(full_file_path)
+  
+    return (submissions_to_send_to_moss, submission_dir)
   except:
     logger.error('{} An error has occured:\n{}'.format(ts, sys.exc_info()[0]))
     raise
