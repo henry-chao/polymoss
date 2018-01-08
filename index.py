@@ -152,7 +152,7 @@ def getSubmissions():
       assignment_id = assignment_id,
       moss_id = user[0],
       user_name = user[1],
-      moss_languages = mosspy.Moss(0).getLanguages()
+      moss_languages = sorted(mosspy.Moss(0).getLanguages())
     )
   except:
     logger.error('{} An error has occured:\n{}'.format(ts, sys.exc_info()[0]))
@@ -216,7 +216,7 @@ def submitToMoss():
     moss_code_type = request.args.get('code_type')
 
     if moss_code_type not in mosspy.Moss(0).getLanguages():
-      moss_code_type = 'Python'
+      moss_code_type = 'python'
 
     m = mosspy.Moss(moss_id, moss_code_type)
     #m.setDirectoryMode(1)
