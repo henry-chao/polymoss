@@ -165,27 +165,29 @@ def submitToMoss():
       config['Canvas']['canvas_instance'],
       course_id,
       assignment_id)
+
     submissions_list = requests.get(URL, headers={'Authorization':'Bearer {}'.format(session['token'])})
-  
     (submissions_to_send_to_moss, submission_dir) = download_submissions_for_moss(submissions_list.json(), course_id, assignment_id)
   
     # Files are all downloaded, now submit to moss
     moss_query = query_db('select MOSS_ID from Users where USER_NAME = ?', [session['name']], one=True)
     moss_id = moss_query[0]
-    moss_code_type = request.args.get('code_type')
 
+    # Validate code type input
+    moss_code_type = request.args.get('code_type')
     if moss_code_type not in mosspy.Moss(0).getLanguages():
       moss_code_type = 'python'
 
+    # Initialize moss connection
     m = mosspy.Moss(moss_id, moss_code_type)
     #m.setDirectoryMode(1)
     logger.info('{} {} Submission directory: {}'.format(ts, session['name'], submission_dir))
     for moss_file in submissions_to_send_to_moss:
       logger.info('{} {} Submitting to moss: {}'.format(ts, session['name'], moss_file))
       m.addFile("{}/{}".format(submission_dir, moss_file),moss_file)
+
+    # Submit moss report and delete staging files
     moss_report_url = m.send()
-  
-    # Moss report returned, so delete files in staging area
     shutil.rmtree(submission_dir)
   
     query_db('INSERT INTO Submissions (MOSS_ID, SUBMISSION_TIME, COURSE_ID, ASSIGNMENT_ID, URL) VALUES(?, ?, ?, ?, ?)',
@@ -202,32 +204,24 @@ def download_submissions_for_moss(submissions_list, course_id, assignment_id):
     # First determine user's home directory
     user_home = os.path.expanduser("~")
     
-    # Create directories for course and assignments
+    # Define directories
     course_dir = "{}/moss_submissions/{}".format(user_home,course_id)
-    make_dir(course_dir)
-    
     assignment_dir = "{}/{}".format(course_dir,assignment_id)
-    make_dir(assignment_dir)
-    
     report_time = strftime('%Y%m%d%H%M%S')
     submission_dir = "{}/{}".format(assignment_dir,report_time)
+
+    # Make directories
     make_dir(submission_dir)
     
     submissions_to_send_to_moss = []
     for submission in submissions_list:
       if submission['workflow_state'] == 'submitted':
-        student_id = submission['user_id']
-        URL = "https://{}/api/v1/users/{}/profile".format(
-          config['Canvas']['canvas_instance'],
-          student_id
-        )
-        student_json = requests.get(URL, headers={'Authorization':'Bearer {}'.format(session['token'])})
-        student_name = student_json.json()['name'].replace(" ","_")
+        student_name = get_student_name(submission['user_id'])
         student_submission_dir = "{}/{}".format(submission_dir,student_name)
         make_dir(student_submission_dir)
         for attachment in submission['attachments']:
           filename = attachment['filename'].replace(" ","_")
-          full_file_path = '{}/{}-{}'.format(student_submission_dir,student_name,filename)
+          full_file_path = '{}/{}'.format(student_submission_dir,filename)
           save_file(attachment['url'], full_file_path)
           if (attachment['content-type'] == 'application/x-zip-compressed'):
             with zipfile.ZipFile(full_file_path,"r") as zip_ref:
@@ -240,9 +234,21 @@ def download_submissions_for_moss(submissions_list, course_id, assignment_id):
                 submissions_to_send_to_moss.append("{}/{}".format(student_name,new_name))
             os.remove(full_file_path)
           else:
-            submissions_to_send_to_moss.append("{}/{}-{}".format(student_name, student_name, filename))
+            submissions_to_send_to_moss.append("{}/{}".format(student_name, filename))
   
     return (submissions_to_send_to_moss, submission_dir)
+  except:
+    logger.error('{} An error has occured:\n{}'.format(ts, sys.exc_info()[0]))
+    raise
+
+def get_student_name(student_id):
+  try:
+    URL = "https://{}/api/v1/users/{}/profile".format(
+      config['Canvas']['canvas_instance'],
+      student_id
+    )
+    student_json = requests.get(URL, headers={'Authorization':'Bearer {}'.format(session['token'])})
+    return student_json.json()['name'].replace(" ","_")
   except:
     logger.error('{} An error has occured:\n{}'.format(ts, sys.exc_info()[0]))
     raise
