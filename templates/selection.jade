@@ -1,15 +1,14 @@
 extends base
 block content
-  .row
-    .col.s12.m12.l12.center-align
-      i.large.material-icons select_all
-      h3 Selection Screen
-  .row.center-align
-    #courseSelection
-      .progress
-        .indeterminate
-  .row.center-align
-    #assignmentSelection
-  .row
-    .col.s12.m12.l12
-      #submissionsDisplay
+  include selection_sidenav.jade
+  #selection_container
+    .row
+      .col.s12.m12.l12.center-align
+        i.large.material-icons select_all
+        h3 Selection Screen
+    .row.center-align
+      #courseSelection
+        .progress
+          .indeterminate
+    .row.center-align
+      #assignmentSelection

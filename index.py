@@ -35,12 +35,44 @@ logger.addHandler(handler)
 
 @app.route("/")
 def index():
-  return render_template('index.jade',
-    title = "PolyMOSS",
-    canvas_instance = config['Canvas']['canvas_instance'],
-    client_id = config['Canvas']['client_id'],
-    redirect_uri = config['Canvas']['redirect_uri']
-  )
+  try:
+    link = ""
+    if 'token' in session:
+      token_req = {'grant_type': 'refresh_token',
+                   'client_id': config['Canvas']['client_id'],
+                   'client_secret': config['Canvas']['client_secret'],
+                   'refresh_token': session['refresh_token']
+      }
+
+      response = requests.post("https://{}/login/oauth2/token".format(config['Canvas']['canvas_instance']), json=token_req)
+      session['token'] = response.json()['access_token']
+
+      link = url_for('selection')
+    else:
+      link = "https://{}/login/oauth2/auth?client_id={}&purpose=polymoss&response_type=code&redirect_uri={}".format(
+        config['Canvas']['canvas_instance'],
+        config['Canvas']['client_id'],
+        config['Canvas']['redirect_uri']
+      )
+    return render_template('index.jade',
+      title = "PolyMOSS",
+      link = link
+    )
+  except:
+    logger.error('{} An error has occured:\n{}'.format(ts, sys.exc_info()[0]))
+    raise
+
+@app.route("/logout")
+def logout():
+  try:
+    URL = "https://{}/login/oauth2/token".format(config['Canvas']['canvas_instance'])
+    del_token_res = requests.delete(URL, headers={'Authorization':'Bearer {}'.format(session['token'])})
+    session.pop('token', None)
+    session.pop('refresh_token', None)
+    return redirect(url_for('index'))
+  except:
+    logger.error('{} An error has occured:\n{}'.format(ts, sys.exc_info()[0]))
+    raise
 
 @app.route("/oauth")
 def ouath():
@@ -48,11 +80,6 @@ def ouath():
     if request.args.get('error') is not None:
       return render_template('canvas_error.jade')
     else:
-      if 'token' in session:
-        # Delete all existing tokens on Canvas, and request a new one
-        URL = "https://{}/login/oauth2/token".format(config['Canvas']['canvas_instance'])
-        del_token_res = requests.delete(URL, headers={'Authorization':'Bearer {}'.format(session['token'])})
-    
       token_req = {'grant_type': 'authorization_code',
                    'client_id': config['Canvas']['client_id'],
                    'client_secret': config['Canvas']['client_secret'],
@@ -61,10 +88,16 @@ def ouath():
       }
     
       response = requests.post("https://{}/login/oauth2/token".format(config['Canvas']['canvas_instance']), json=token_req)
-      access_token = response.json()['access_token']
-      session['name'] = response.json()['user']['name']
-      logger.info('{} Canvas auth token received for user: {}'.format(ts, session['name']))
+      response_json = response.json()
+      username = response_json['user']['name']
+      access_token = response_json['access_token']
+      refresh_token = response_json['refresh_token']
+
+      session['name'] = username
       session['token'] = access_token
+      session['refresh_token'] = refresh_token
+
+      logger.info('{} Canvas auth token received for user: {}'.format(ts, session['name']))
       return redirect(url_for('selection'))
   except:
     logger.error('{} An error has occured:\n{}'.format(ts, sys.exc_info()[0]))
@@ -72,9 +105,20 @@ def ouath():
 
 @app.route("/selection")
 def selection():
-  return render_template('selection.jade',
-    selectionjs = True
-  )
+  try:
+    # Query database for user information
+    user = query_db('select * from Users where USER_NAME = ?', [session['name']], one=True)
+    logger.info('{} Found user {}'.format(ts, user))
+
+    return render_template('selection.jade',
+      selectionjs = True,
+      user_name = user[1],
+      moss_id = user[0],
+      moss_languages = sorted(mosspy.Moss(0).getLanguages())
+    )
+  except:
+    logger.error('{} An error has occured:\n{}'.format(ts, sys.exc_info()[0]))
+    raise
 
 @app.route("/getCourses", methods=['POST','GET'])
 def getCourses():
@@ -83,23 +127,26 @@ def getCourses():
   
     # If part of multiple courses, pagination will occur. This will redirect to another page of courses for the request
     json_data = json.loads(request.get_json())
+
     if not(json_data['url'] == "undefined"):
       if validators.url(json_data['url']):
         URL = json_data['url']
   
     response = requests.get(URL, headers={'Authorization':'Bearer {}'.format(session['token'])})
+    course_list = response.json()
+
+    prev_link = None
+    next_link = None
     links_list = response.headers['Link'].split(",")
-    page_list = {}
     for link in links_list:
       if "prev" in link:
         sublink = link.split(";")
-        page_list['prev'] = sublink[0][1:-1]
+        prev_link = sublink[0][1:-1]
       elif "next" in link:
         sublink = link.split(";")
-        page_list['next'] = sublink[0][1:-1]
-    course_list = response.json()
+        next_link = sublink[0][1:-1]
     return render_template('courses.jade',
-      response_obj = {'links':page_list,'course_list':course_list}
+      response_obj = {'prev_link':prev_link,'next_link':next_link,'course_list':course_list}
     )
   except:
     logger.error('{} An error has occured:\n{}'.format(ts, sys.exc_info()[0]))

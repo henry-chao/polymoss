@@ -1,0 +1,12 @@
+#selection_container, footer {
+  padding-left: 400px;
+}
+
+#side_nav {
+  margin-top: 64px;
+  width: 400px;
+}
+
+.moss_submission_field {
+  padding: 20px;
+}

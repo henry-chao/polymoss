@@ -1,15 +1,16 @@
 h4 Courses
-for course in response_obj.course_list
-  .col.s4.m3
-    .card.small.blue-grey.darken-1
-      .card-content.white-text
-        span.card-title #{course.course_code}
-        p #{course.name}
-      .card-action.blue-grey
-        a(onClick="getAssignments(#{course.id});") Select
-
-if response_obj.links
-  .row#nav_btns_row
-    .col.s12
-      for link in response_obj.links
-        a.btn(onClick="getCourses(#{link.link});") #{link}
+.row
+  for course in response_obj.course_list
+    .col.s4.m3
+      .card.small.blue-grey.darken-1
+        .card-content.white-text
+          span.card-title #{course.course_code}
+          p #{course.name}
+        .card-action.blue-grey
+          a.btn(onClick="getAssignments(#{course.id});") Select
+.row#nav_btns_row
+  .col.s12
+  if response_obj.prev_link
+    a.btn(onClick="getCourses('#{response_obj.prev_link}');") Prev
+  if response_obj.next_link
+    a.btn(onClick="getCourses('#{response_obj.next_link}');") Next

@@ -1,0 +1,28 @@
+ul.side-nav.fixed.teal.lighten-3#side_nav
+  li.center
+    span.white-text Submitting assignments under MOSS ID #[b #{moss_id}]
+    br
+    span.white-text For user #[b #{user_name}]
+    a.btn.waves-effect.waves-light.red(href="/logout") Logout
+  li
+    ul.collection
+      li.collection-item.teal.accent-4
+        span.teal-text.text-accent-1 Select assignments for submission
+          #submission_assignments
+      li.collection-item.teal.accent-4
+        span.teal-text.text-accent-1 Submit base files (optional)
+        form#base_submission
+          .file-field.input-field
+            .btn
+              span File
+              input(type="file")
+            .file-path-wrapper
+              input.file-path.validate(type="text", placeholder="Upload a zip, py, or java file")
+  li.center.moss_submission_field
+    .input-field.col.s6.white-text
+      select#code_type
+        each language in moss_languages
+          option= language
+      label.teal-text.text-accent-1 Select code type:
+    a.btn.disabled.waves-effect.waves-light.red#moss_submit_btn(onclick="submitToMoss( #{course_id} , #{assignment_id} );") Submit to Moss
+    #moss_response

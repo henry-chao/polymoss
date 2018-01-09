@@ -16,9 +16,10 @@ function getCourses(url){
 function getAssignments(id){
   // Clear previous assignment entries
   $("#assignmentSelection").empty();
-  $("#submissionsDisplay").empty();
+  $("#assignmentSelection").append("<div class='progress'><div class='indeterminate'></div></div>");
 
   $.get("/getAssignments?id=" + id, function(data, status){
+    $("#assignmentSelection").empty();
     $("#assignmentSelection").append( data );
   });
 
@@ -30,20 +31,17 @@ function getAssignments(id){
   }, 500);
 };
 
-function getSubmissions(course_id, assignment_id){
-  $("#submissionsDisplay").empty();
-
-  $.get("/getSubmissions?course_id=" + course_id + "&assignment_id=" + assignment_id, function(data, status){
-    $("#submissionsDisplay").append( data );
-    $('#code_type').material_select();
-  });
-
-  // Scroll down if there is a long list of courses and assignments
-  setTimeout( function(){
-    $("html, body").animate({
-      scrollTop: $("#submissionsDisplay").offset().top
-    }, 2000);
-  }, 500);
+var submission_assignments = {}
+function addAssignmentToSubmissions(course_id, assignment_id, assignment_name){
+  if(submission_assignments[assignment_name] == null){
+    $("#submission_assignments").append("<div class='chip assignment_chip'>" + assignment_name + "<i class='close material-icons'>close</i></div>");
+    submission_assignments[assignment_name] = {"course_id": course_id, "assignment_id": assignment_id};
+    $('.assignment_chip').click(function() {
+      assignment_name = $( this ).text();
+      assignment_name = assignment_name.substring(0, assignment_name.length - 5);
+      delete submission_assignments[assignment_name];
+    });
+  };
 };
 
 function submitToMoss(course_id, assignment_id){
@@ -64,5 +62,6 @@ function submitToMoss(course_id, assignment_id){
 };
 
 $(document).ready(function() {
+  $('#code_type').material_select();
   getCourses();
 });
