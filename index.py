@@ -179,9 +179,10 @@ def submitToMoss():
 
     m = mosspy.Moss(moss_id, moss_code_type)
     #m.setDirectoryMode(1)
+    logger.info('{} {} Submission directory: {}'.format(ts, session['name'], submission_dir))
     for moss_file in submissions_to_send_to_moss:
       logger.info('{} {} Submitting to moss: {}'.format(ts, session['name'], moss_file))
-      m.addFile(moss_file)
+      m.addFile("{}/{}".format(submission_dir, moss_file),moss_file)
     moss_report_url = m.send()
   
     # Moss report returned, so delete files in staging area
@@ -221,20 +222,25 @@ def download_submissions_for_moss(submissions_list, course_id, assignment_id):
           student_id
         )
         student_json = requests.get(URL, headers={'Authorization':'Bearer {}'.format(session['token'])})
-        student_name = student_json.json()['name']
+        student_name = student_json.json()['name'].replace(" ","_")
         student_submission_dir = "{}/{}".format(submission_dir,student_name)
         make_dir(student_submission_dir)
         for attachment in submission['attachments']:
-          full_file_path = '{}/{}-{}'.format(student_submission_dir,student_name,attachment['filename'])
+          filename = attachment['filename'].replace(" ","_")
+          full_file_path = '{}/{}-{}'.format(student_submission_dir,student_name,filename)
           save_file(attachment['url'], full_file_path)
           if (attachment['content-type'] == 'application/x-zip-compressed'):
             with zipfile.ZipFile(full_file_path,"r") as zip_ref:
               zip_ref.extractall(student_submission_dir)
               for extracted_file in zip_ref.namelist():
-                submissions_to_send_to_moss.append("{}/{}".format(student_submission_dir,extracted_file))
+                original_name = extracted_file
+                new_name = extracted_file.replace(" ","_")
+                os.rename("{}/{}".format(student_submission_dir,original_name),
+                          "{}/{}".format(student_submission_dir,new_name))
+                submissions_to_send_to_moss.append("{}/{}".format(student_name,new_name))
             os.remove(full_file_path)
           else:
-            submissions_to_send_to_moss.append(full_file_path)
+            submissions_to_send_to_moss.append("{}/{}-{}".format(student_name, student_name, filename))
   
     return (submissions_to_send_to_moss, submission_dir)
   except:
