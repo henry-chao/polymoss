@@ -5,6 +5,7 @@ import os
 import sys
 import pycurl
 import mosspy
+import mossum
 import shutil
 import json
 import zipfile
@@ -180,6 +181,7 @@ def submitToMoss():
 
     # Initialize moss connection
     m = mosspy.Moss(moss_id, moss_code_type)
+    m.setCommentString("Report for course id {} assignment id {}".format(course_id, assignment_id))
     #m.setDirectoryMode(1)
     logger.info('{} {} Submission directory: {}'.format(ts, session['name'], submission_dir))
     for moss_file in submissions_to_send_to_moss:
