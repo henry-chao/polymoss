@@ -15,6 +15,7 @@ from logging.handlers import RotatingFileHandler
 from time import strftime
 import sqlite3
 import validators
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.jinja_env.add_extension('pyjade.ext.jinja.PyJadeExtension')
@@ -27,6 +28,9 @@ database = config['Database']['path']
 
 ts = strftime(config['Logging']['time_format'])
 logfile_location = config['Logging']['log_file_location']
+
+upload_directory = config['Uploads']['path']
+upload_allowed_extensions = config['Uploads']['extensions']
 
 handler = RotatingFileHandler(logfile_location, maxBytes=10000, backupCount=3)
 logger = logging.getLogger('__name__')
@@ -114,7 +118,8 @@ def selection():
       selectionjs = True,
       user_name = user[1],
       moss_id = user[0],
-      moss_languages = sorted(mosspy.Moss(0).getLanguages())
+      moss_languages = sorted(mosspy.Moss(0).getLanguages()),
+      extensions = upload_allowed_extensions
     )
   except:
     logger.error('{} An error has occured:\n{}'.format(ts, sys.exc_info()[0]))
@@ -171,58 +176,26 @@ def getAssignments():
     logger.error('{} An error has occured:\n{}'.format(ts, sys.exc_info()[0]))
     raise
 
-@app.route("/getSubmissions")
-def getSubmissions():
+@app.route("/uploadBaseFile", methods=['POST'])
+def uploadBaseFile():
   try:
-    course_id = request.args.get('course_id', type=int)
-    assignment_id = request.args.get('assignment_id', type=int)
-    URL = "https://{}/api/v1/courses/{}/assignments/{}/submissions".format(
-      config['Canvas']['canvas_instance'],
-      course_id,
-      assignment_id)
-    logger.info('{} {} Getting submission count for course {} assignment {}'.format(ts, session['name'], course_id, assignment_id))
-    submissions_response = requests.get(URL, headers={'Authorization':'Bearer {}'.format(session['token'])}).json()
-  
-    submissions_count = 0
-    for sr in submissions_response:
-      if sr['workflow_state'] == 'submitted':
-        submissions_count += 1
-  
-    # Query database for user information
-    user = query_db('select * from Users where USER_NAME = ?', [session['name']], one=True)
-    logger.info('{} Found user {}'.format(ts, user))
-  
-    return render_template('submission.jade',
-      submissions_count = submissions_count,
-      course_id = course_id,
-      assignment_id = assignment_id,
-      moss_id = user[0],
-      user_name = user[1],
-      moss_languages = sorted(mosspy.Moss(0).getLanguages())
-    )
+    if 'file' in request.files:
+      return get_base_files(request.files['file'], upload_directory)
   except:
     logger.error('{} An error has occured:\n{}'.format(ts, sys.exc_info()[0]))
     raise
 
-@app.route("/submitToMoss")
+@app.route("/submitToMoss", methods=['POST'])
 def submitToMoss():
   try:
-    course_id = request.args.get('course_id', type=int)
-    assignment_id = request.args.get('assignment_id', type=int)
-    URL = "https://{}/api/v1/courses/{}/assignments/{}/submissions".format(
-      config['Canvas']['canvas_instance'],
-      course_id,
-      assignment_id)
+    request_json = request.get_json()
 
-    submissions_list = requests.get(URL, headers={'Authorization':'Bearer {}'.format(session['token'])})
-    (submissions_to_send_to_moss, submission_dir) = download_submissions_for_moss(submissions_list.json(), course_id, assignment_id)
-  
     # Files are all downloaded, now submit to moss
     moss_query = query_db('select MOSS_ID from Users where USER_NAME = ?', [session['name']], one=True)
     moss_id = moss_query[0]
 
     # Validate code type input
-    moss_code_type = request.args.get('code_type')
+    moss_code_type = request_json['code_type']
     if moss_code_type not in mosspy.Moss(0).getLanguages():
       moss_code_type = 'python'
 
@@ -231,9 +204,25 @@ def submitToMoss():
     m.setCommentString("Report for course id {} assignment id {}".format(course_id, assignment_id))
     #m.setDirectoryMode(1)
     logger.info('{} {} Submission directory: {}'.format(ts, session['name'], submission_dir))
-    for moss_file in submissions_to_send_to_moss:
-      logger.info('{} {} Submitting to moss: {}'.format(ts, session['name'], moss_file))
-      m.addFile("{}/{}".format(submission_dir, moss_file),moss_file)
+
+    for submission in request_json['submissions']:
+      course_id = submission['course_id']
+      assignment_id = submission['assignment_id']
+      URL = "https://{}/api/v1/courses/{}/assignments/{}/submissions".format(
+        config['Canvas']['canvas_instance'],
+        course_id,
+        assignment_id)
+
+      submissions_list = requests.get(URL, headers={'Authorization':'Bearer {}'.format(session['token'])})
+      (submissions_to_send_to_moss, submission_dir) = download_submissions_for_moss(submissions_list.json(), course_id, assignment_id)
+      
+      for moss_file in submissions_to_send_to_moss:
+        logger.info('{} {} Submitting to moss: {}'.format(ts, session['name'], moss_file))
+        m.addFile(os.path.join(submission_dir, moss_file),moss_file)
+
+    if 'base_files' in request_json:
+      for base_file in request_json['base_files']:
+        m.addBaseFile(base_file)
 
     # Submit moss report and delete staging files
     moss_report_url = m.send()
@@ -254,10 +243,10 @@ def download_submissions_for_moss(submissions_list, course_id, assignment_id):
     user_home = os.path.expanduser("~")
     
     # Define directories
-    course_dir = "{}/moss_submissions/{}".format(user_home,course_id)
-    assignment_dir = "{}/{}".format(course_dir,assignment_id)
+    course_dir = os.path.join(user_home,"moss_submissions",course_id)
+    assignment_dir = os.path.join(course_dir,assignment_id)
     report_time = strftime('%Y%m%d%H%M%S')
-    submission_dir = "{}/{}".format(assignment_dir,report_time)
+    submission_dir = os.path.join(assignment_dir,report_time)
 
     # Make directories
     make_dir(submission_dir)
@@ -266,24 +255,16 @@ def download_submissions_for_moss(submissions_list, course_id, assignment_id):
     for submission in submissions_list:
       if submission['workflow_state'] == 'submitted':
         student_name = get_student_name(submission['user_id'])
-        student_submission_dir = "{}/{}".format(submission_dir,student_name)
+        student_submission_dir = os.path.join(submission_dir,student_name)
         make_dir(student_submission_dir)
         for attachment in submission['attachments']:
           filename = attachment['filename'].replace(" ","_")
-          full_file_path = '{}/{}'.format(student_submission_dir,filename)
+          full_file_path = os.path.join(student_submission_dir,filename)
           save_file(attachment['url'], full_file_path)
           if (attachment['content-type'] == 'application/x-zip-compressed'):
-            with zipfile.ZipFile(full_file_path,"r") as zip_ref:
-              zip_ref.extractall(student_submission_dir)
-              for extracted_file in zip_ref.namelist():
-                original_name = extracted_file
-                new_name = extracted_file.replace(" ","_")
-                os.rename("{}/{}".format(student_submission_dir,original_name),
-                          "{}/{}".format(student_submission_dir,new_name))
-                submissions_to_send_to_moss.append("{}/{}".format(student_name,new_name))
-            os.remove(full_file_path)
+            submissions_to_send_to_moss = extract_zip_and_get_list(full_file_path, student_submission_dir)
           else:
-            submissions_to_send_to_moss.append("{}/{}".format(student_name, filename))
+            submissions_to_send_to_moss.append(os.path.join(student_name, filename))
   
     return (submissions_to_send_to_moss, submission_dir)
   except:
@@ -349,4 +330,33 @@ def query_db(query, args=(), one=False, insert=False):
   except:
     logger.error('{} An error has occured:\n{}'.format(ts, sys.exc_info()[0]))
     raise
+
+def allowed_file(filename):
+  return '.' in filename and filename.rsplit('.',1)[1].lower() in upload_allowed_extensions
+
+def extract_zip_and_get_list(zip_file, location):
+  list_of_zip_extracts = []
+  with zipfile.ZipFile(zip_file,"r") as zip_ref:
+    zip_ref.extractall(location)
+    for extracted_file in zip_ref.namelist():
+      original_name = extracted_file
+      new_name = extracted_file.replace(" ","_")
+      os.rename(os.path.join(location,original_name),
+                os.path.join(location,new_name))
+      list_of_zip_extracts.append(os.path.join(student_name,new_name))
+  return list_of_zip_extracts
+
+def get_base_files(base_file):
+  if base_file.filename != '' and allowed_file(base_file.filename):
+    base_filename = secure_filename(base_file.filename)
+    base_file_dir = os.path.join(submission_dir, "base_files")
+    make_dir(base_file_dir)
+    base_file_location = os.path.join(base_file_dir, base_filename)
+    base_file.save(base_file_location)
+    base_files_to_send_to_moss = []
+    if zipfile.is_zipfile(base_file_location):
+      base_files_to_send_to_moss = extract_zip_and_get_list(base_file_location, base_file_dir)
+    else:
+      base_files_to_send_to_moss.append(base_file_location)
+    return base_files_to_send_to_moss
 

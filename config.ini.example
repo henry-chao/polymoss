@@ -14,3 +14,7 @@ log_file_location = /var/log/polymoss/app.log
 [Database]
 path = /path/to/database/file
 
+[Uploads]
+extensions = ['zip','py','java']
+path = /path/to/file/uploads
+

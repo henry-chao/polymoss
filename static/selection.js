@@ -40,7 +40,13 @@ function addAssignmentToSubmissions(course_id, assignment_id, assignment_name){
       assignment_name = $( this ).text();
       assignment_name = assignment_name.substring(0, assignment_name.length - 5);
       delete submission_assignments[assignment_name];
+      if (Object.keys(submission_assignments).length == 0) {
+        $("#moss_submit_btn").addClass('disabled');
+      };
+      $( this ).remove();
     });
+
+    $("#moss_submit_btn").removeClass('disabled');
   };
 };
 
