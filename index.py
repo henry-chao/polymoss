@@ -179,8 +179,10 @@ def getAssignments():
 @app.route("/uploadBaseFile", methods=['POST'])
 def uploadBaseFile():
   try:
-    if 'file' in request.files:
-      return get_base_files(request.files['file'], upload_directory)
+    if 'base_file' in request.files:
+      return ','.join(get_base_files(request.files['base_file'], upload_directory))
+    else:
+      return ""
   except:
     logger.error('{} An error has occured:\n{}'.format(ts, sys.exc_info()[0]))
     raise
@@ -201,11 +203,10 @@ def submitToMoss():
 
     # Initialize moss connection
     m = mosspy.Moss(moss_id, moss_code_type)
-    m.setCommentString("Report for course id {} assignment id {}".format(course_id, assignment_id))
     #m.setDirectoryMode(1)
-    logger.info('{} {} Submission directory: {}'.format(ts, session['name'], submission_dir))
 
-    for submission in request_json['submissions']:
+    for key in request_json['submissions']:
+      submission = request_json['submissions'][key]
       course_id = submission['course_id']
       assignment_id = submission['assignment_id']
       URL = "https://{}/api/v1/courses/{}/assignments/{}/submissions".format(
@@ -243,10 +244,10 @@ def download_submissions_for_moss(submissions_list, course_id, assignment_id):
     user_home = os.path.expanduser("~")
     
     # Define directories
-    course_dir = os.path.join(user_home,"moss_submissions",course_id)
-    assignment_dir = os.path.join(course_dir,assignment_id)
+    course_dir = os.path.join(user_home, "moss_submissions", str(course_id))
+    assignment_dir = os.path.join(course_dir, str(assignment_id))
     report_time = strftime('%Y%m%d%H%M%S')
-    submission_dir = os.path.join(assignment_dir,report_time)
+    submission_dir = os.path.join(assignment_dir, report_time)
 
     # Make directories
     make_dir(submission_dir)
@@ -255,14 +256,16 @@ def download_submissions_for_moss(submissions_list, course_id, assignment_id):
     for submission in submissions_list:
       if submission['workflow_state'] == 'submitted':
         student_name = get_student_name(submission['user_id'])
-        student_submission_dir = os.path.join(submission_dir,student_name)
+        student_submission_dir = os.path.join(submission_dir, student_name)
         make_dir(student_submission_dir)
         for attachment in submission['attachments']:
           filename = attachment['filename'].replace(" ","_")
-          full_file_path = os.path.join(student_submission_dir,filename)
+          full_file_path = os.path.join(student_submission_dir, filename)
           save_file(attachment['url'], full_file_path)
           if (attachment['content-type'] == 'application/x-zip-compressed'):
-            submissions_to_send_to_moss = extract_zip_and_get_list(full_file_path, student_submission_dir)
+            file_list = extract_zip_and_get_list(full_file_path, student_submission_dir)
+            for each_file in file_list:
+               submissions_to_send_to_moss.append(os.path.join(student_name, each_file))
           else:
             submissions_to_send_to_moss.append(os.path.join(student_name, filename))
   
@@ -343,19 +346,20 @@ def extract_zip_and_get_list(zip_file, location):
       new_name = extracted_file.replace(" ","_")
       os.rename(os.path.join(location,original_name),
                 os.path.join(location,new_name))
-      list_of_zip_extracts.append(os.path.join(student_name,new_name))
+      list_of_zip_extracts.append(new_name)
   return list_of_zip_extracts
 
-def get_base_files(base_file):
+def get_base_files(base_file, base_file_dir):
   if base_file.filename != '' and allowed_file(base_file.filename):
     base_filename = secure_filename(base_file.filename)
-    base_file_dir = os.path.join(submission_dir, "base_files")
     make_dir(base_file_dir)
     base_file_location = os.path.join(base_file_dir, base_filename)
     base_file.save(base_file_location)
     base_files_to_send_to_moss = []
     if zipfile.is_zipfile(base_file_location):
-      base_files_to_send_to_moss = extract_zip_and_get_list(base_file_location, base_file_dir)
+      file_list = extract_zip_and_get_list(base_file_location, base_file_dir)
+      for each_file in file_list:
+        base_files_to_send_to_moss.append(os.path.join(base_file_dir, each_file))
     else:
       base_files_to_send_to_moss.append(base_file_location)
     return base_files_to_send_to_moss

@@ -50,22 +50,52 @@ function addAssignmentToSubmissions(course_id, assignment_id, assignment_name){
   };
 };
 
-function submitToMoss(course_id, assignment_id){
+function submitToMoss(){
   $("#moss_submit_btn").prop("disabled", true);
   $("#moss_response").empty();
   $("#moss_response").append("<div class='progress'><div class='indeterminate'></div></div>");
 
-  $.get("/submitToMoss?course_id=" + course_id + "&assignment_id=" + assignment_id + "&code_type=" + $("#code_type").val(),
-    function(url, status){
-      $("#moss_response").empty();
-      $("#moss_response").append("<span class='white-text'>See the Moss report at: " +
-        "<a class='indigo-text' target='_blank' href='" + url + "'>" + url + "</a></span>");
+  var base_file_location = null;
+  if( $("#base_file")[0].files.length > 0) {
+    var form_data = new FormData($("#base_submission")[0]);
+    $.ajax({
+      type: 'post',
+      url: '/uploadBaseFile',
+      data: form_data,
+      processData: false,
+      contentType: false
+    }).done(function(data) {
+        submission_data = {
+          'code_type': $("#code_type").val(),
+          'submissions': submission_assignments,
+          'base_files': [data]
+        }
+        get_moss_report(submission_data);
+    });
+  } else {
+    submission_data = {
+      'code_type': $("#code_type").val(),
+      'submissions': submission_assignments
     }
-  ).fail(function(){
-    $("#moss_response").empty();
-    $("#moss_response").append("<span class='red-text text-darken-4'>An error has occured during the MOSS submission process</span>");
-  });
+    get_moss_report(submission_data);
+  }
 };
+
+function get_moss_report(data){
+  $.ajax({
+    type: 'post',
+    url: '/submitToMoss',
+    data: JSON.stringify(data),
+    contentType: 'application/json'
+  }).done( function(url, status) {
+    $("#moss_response").empty();
+    $("#moss_response").append("<span class='white-text'>See the Moss report at: " +
+      "<a class='indigo-text' target='_blank' href='" + url + "'>" + url + "</a></span>");
+  }).fail( function(jqXHR, status, error) {
+     $("#moss_response").empty();
+     $("#moss_response").append("<span class='red-text text-darken-4'>An error has occured during the MOSS submission process</span>");
+  });
+}
 
 $(document).ready(function() {
   $('#code_type').material_select();
