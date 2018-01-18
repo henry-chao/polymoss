@@ -17,6 +17,8 @@ import sqlite3
 import validators
 from werkzeug.utils import secure_filename
 
+import pdb
+
 app = Flask(__name__)
 app.jinja_env.add_extension('pyjade.ext.jinja.PyJadeExtension')
 
@@ -113,7 +115,7 @@ def selection():
     # Query database for user information
     user = query_db('select * from Users where USER_NAME = ?', [session['name']], one=True)
     logger.info('{} Found user {}'.format(ts, user))
-
+ 
     return render_template('selection.jade',
       selectionjs = True,
       user_name = user[1],
@@ -142,6 +144,10 @@ def getCourses():
 
     prev_link = None
     next_link = None
+
+    if 'Link' not in response.headers:
+      return render_template('timeout.jade')
+
     links_list = response.headers['Link'].split(",")
     for link in links_list:
       if "prev" in link:
@@ -265,7 +271,7 @@ def download_submissions_for_moss(submissions_list, course_id, assignment_id):
           if (attachment['content-type'] == 'application/x-zip-compressed'):
             file_list = extract_zip_and_get_list(full_file_path, student_submission_dir)
             for each_file in file_list:
-               submissions_to_send_to_moss.append(os.path.join(student_name, each_file))
+              submissions_to_send_to_moss.append(os.path.join(student_name, each_file))
           else:
             submissions_to_send_to_moss.append(os.path.join(student_name, filename))
   
@@ -341,12 +347,16 @@ def extract_zip_and_get_list(zip_file, location):
   list_of_zip_extracts = []
   with zipfile.ZipFile(zip_file,"r") as zip_ref:
     zip_ref.extractall(location)
-    for extracted_file in zip_ref.namelist():
-      original_name = extracted_file
-      new_name = extracted_file.replace(" ","_")
-      os.rename(os.path.join(location,original_name),
-                os.path.join(location,new_name))
-      list_of_zip_extracts.append(new_name)
+  os.remove(zip_file)
+  for dirpath, subdirname, files_in_path in os.walk(location):
+    if len(files_in_path) > 0:
+      for the_file in files_in_path:
+        original_name = the_file
+        new_name = the_file.replace(" ","_")
+        subpath = dirpath[len(location)+1:]
+        os.rename(os.path.join(dirpath,original_name),
+                  os.path.join(dirpath,new_name))
+        list_of_zip_extracts.append(os.path.join(subpath,new_name))
   return list_of_zip_extracts
 
 def get_base_files(base_file, base_file_dir):
