@@ -51,7 +51,7 @@ function addAssignmentToSubmissions(course_id, assignment_id, assignment_name){
 };
 
 function submitToMoss(){
-  $("#moss_submit_btn").prop("disabled", true);
+  $("#moss_submit_btn").addClass("disabled");
   $("#moss_response").empty();
   $("#moss_response").append("<div class='progress'><div class='indeterminate'></div></div>");
 
@@ -91,9 +91,11 @@ function get_moss_report(data){
     $("#moss_response").empty();
     $("#moss_response").append("<span class='white-text'>See the Moss report at: " +
       "<a class='indigo-text' target='_blank' href='" + url + "'>" + url + "</a></span>");
+    $("#moss_submit_btn").removeClass("disabled");
   }).fail( function(jqXHR, status, error) {
-     $("#moss_response").empty();
-     $("#moss_response").append("<span class='red-text text-darken-4'>An error has occured during the MOSS submission process</span>");
+    $("#moss_response").empty();
+    $("#moss_response").append("<span class='red-text text-darken-4'>An error has occured during the MOSS submission process</span>");
+    $("#moss_submit_btn").removeClass("disabled");
   });
 }
 
