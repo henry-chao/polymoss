@@ -228,7 +228,8 @@ def submitToMoss():
         m.addFile(os.path.join(submission_dir, moss_file),moss_file)
 
     if 'base_files' in request_json:
-      for base_file in request_json['base_files']:
+      list_of_base_files = request_json['base_files'][0].split(",")
+      for base_file in list_of_base_files:
         m.addBaseFile(base_file)
 
     # Submit moss report and delete staging files
@@ -349,13 +350,16 @@ def extract_zip_and_get_list(zip_file, location):
     zip_ref.extractall(location)
   os.remove(zip_file)
   for dirpath, subdirname, files_in_path in os.walk(location):
+    original_path = dirpath
+    new_path = dirpath.replace(" ","_")
+    os.rename(original_path, new_path)
     if len(files_in_path) > 0:
       for the_file in files_in_path:
         original_name = the_file
         new_name = the_file.replace(" ","_")
-        subpath = dirpath[len(location)+1:]
-        os.rename(os.path.join(dirpath,original_name),
-                  os.path.join(dirpath,new_name))
+        subpath = new_path[len(location)+1:]
+        os.rename(os.path.join(new_path,original_name),
+                  os.path.join(new_path,new_name))
         list_of_zip_extracts.append(os.path.join(subpath,new_name))
   return list_of_zip_extracts
 
