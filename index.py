@@ -112,7 +112,6 @@ def ouath():
 @app.route("/selection")
 def selection():
   try:
-    # Query database for user information
     user = query_db('select * from Users where USER_NAME = ?', [session['name']], one=True)
     logger.info('{} Found user {}'.format(ts, user))
  
@@ -132,9 +131,8 @@ def getCourses():
   try:
     URL = "https://{}/api/v1/courses?per_page=12".format(config['Canvas']['canvas_instance'])
   
-    # If part of multiple courses, pagination will occur. This will redirect to another page of courses for the request
+    # If part of multiple courses, pagination will occur. This will request another page of courses
     json_data = json.loads(request.get_json())
-
     if not(json_data['url'] == "undefined"):
       if validators.url(json_data['url']):
         URL = json_data['url']
@@ -196,25 +194,54 @@ def uploadBaseFile():
 @app.route("/submitToMoss", methods=['POST'])
 def submitToMoss():
   try:
+    # Get form information from site
     request_json = request.get_json()
 
-    # Files are all downloaded, now submit to moss
     moss_query = query_db('select MOSS_ID from Users where USER_NAME = ?', [session['name']], one=True)
     moss_id = moss_query[0]
-
-    # Validate code type input
     moss_code_type = request_json['code_type']
     if moss_code_type not in mosspy.Moss(0).getLanguages():
       moss_code_type = 'python'
 
     # Initialize moss connection
     m = mosspy.Moss(moss_id, moss_code_type)
-    #m.setDirectoryMode(1)
 
-    for key in request_json['submissions']:
-      submission = request_json['submissions'][key]
+    (submission_dir, course_and_assignment_list) = pull_submission_requests(request_json['submissions'], m)
+
+    if 'base_files' in request_json:
+      add_base_files_to_moss(request_json, m)
+
+    # Submit moss report and delete staging files
+    moss_report_url = m.send()
+    shutil.rmtree(submission_dir)
+  
+    add_report_to_db(moss_id, moss_report_url, course_and_assignment_list)
+  
+    return moss_report_url
+  except:
+    logger.error('{} An error has occured:\n{}'.format(ts, sys.exc_info()[0]))
+    raise
+
+def add_report_to_db(moss_id, moss_report_url, course_and_assignment_list):
+  try:
+    for entry in course_and_assignment_list:
+      course_id = entry['course_id']
+      assignment_id = entry['assignment_id']
+      query_db('INSERT INTO Submissions (MOSS_ID, SUBMISSION_TIME, COURSE_ID, ASSIGNMENT_ID, URL) VALUES(?, ?, ?, ?, ?)',
+        [int(moss_id), strftime('%Y-%m-%d %H:%M:%S.000'), int(course_id), int(assignment_id), moss_report_url], insert=True)
+  except:
+    logger.error('{} An error has occured:\n{}'.format(ts, sys.exc_info()[0]))
+    raise
+
+def pull_submission_requests(submissions_req_list, moss_instance):
+  try:
+    course_and_assignment_list = []
+    for key in submissions_req_list:
+      submission = submissions_req_list[key]
       course_id = submission['course_id']
       assignment_id = submission['assignment_id']
+      course_and_assignment_list.append({'course_id': course_id, 'assignment_id': assignment_id})
+
       URL = "https://{}/api/v1/courses/{}/assignments/{}/submissions".format(
         config['Canvas']['canvas_instance'],
         course_id,
@@ -222,35 +249,35 @@ def submitToMoss():
 
       submissions_list = requests.get(URL, headers={'Authorization':'Bearer {}'.format(session['token'])})
       (submissions_to_send_to_moss, submission_dir) = download_submissions_for_moss(submissions_list.json(), course_id, assignment_id)
-      
+
       for moss_file in submissions_to_send_to_moss:
         logger.info('{} {} Submitting to moss: {}'.format(ts, session['name'], moss_file))
-        m.addFile(os.path.join(submission_dir, moss_file),moss_file)
+        moss_instance.addFile(os.path.join(submission_dir, moss_file), moss_file)
 
-    if 'base_files' in request_json:
-      list_of_base_files = request_json['base_files'][0].split(",")
-      for base_file in list_of_base_files:
-        m.addBaseFile(base_file)
-
-    # Submit moss report and delete staging files
-    moss_report_url = m.send()
-    shutil.rmtree(submission_dir)
-  
-    query_db('INSERT INTO Submissions (MOSS_ID, SUBMISSION_TIME, COURSE_ID, ASSIGNMENT_ID, URL) VALUES(?, ?, ?, ?, ?)',
-      [int(moss_id),strftime('%Y-%m-%d %H:%M:%S.000'),int(course_id),int(assignment_id),moss_report_url], insert=True)
-  
-    return moss_report_url
+    return submission_dir, course_and_assignment_list
   except:
     logger.error('{} An error has occured:\n{}'.format(ts, sys.exc_info()[0]))
     raise
 
+def add_base_files_to_moss(request, moss_instance):
+  try:
+    list_of_base_files = request['base_files'][0].split(",")
+    for base_file in list_of_base_files:
+      moss_instance.addBaseFile(base_file)
+  except:
+    logger.error('{} An error has occured:\n{}'.format(ts, sys.exc_info()[0]))
+    raise
+
+'''
+Directory path reference:
+
+submission_dir = user_home/moss_submissions/course_id/assignment_id/report_time
+student_submission_dir = user_home/moss_submissions/course_id/assignment_id/report_time/student_name
+'''
 def download_submissions_for_moss(submissions_list, course_id, assignment_id):
   try:
     ## Begin building out directory locations to download submissions
-    # First determine user's home directory
     user_home = os.path.expanduser("~")
-    
-    # Define directories
     course_dir = os.path.join(user_home, "moss_submissions", str(course_id))
     assignment_dir = os.path.join(course_dir, str(assignment_id))
     report_time = strftime('%Y%m%d%H%M%S')
@@ -369,6 +396,7 @@ def get_base_files(base_file, base_file_dir):
     make_dir(base_file_dir)
     base_file_location = os.path.join(base_file_dir, base_filename)
     base_file.save(base_file_location)
+
     base_files_to_send_to_moss = []
     if zipfile.is_zipfile(base_file_location):
       file_list = extract_zip_and_get_list(base_file_location, base_file_dir)
